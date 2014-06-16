@@ -1,3 +1,6 @@
+// Based on the good work by others, mostly Jim Easterbrook on the WH1080 (and derivative) Weather Stations
+// available in UK through Maplin at www.maplin.co.uk/p/black-usb-wireless-touchscreen-weather-forecaster-n96gy
+// some other resources:
 // https://github.com/jim-easterbrook/pywws/blob/master/pywws/WeatherStation.py
 // http://www.jim-easterbrook.me.uk/weather/mm/
 // http://www.signal11.us/oss/hidapi/
@@ -8,11 +11,11 @@ const	restify = require('restify'),
 
 var wusb = {
 	conf: {
-		vid: 0x1941,
-		pid: 0x8021,
+		vid: 0x1941, // USB ID
+		pid: 0x8021, // USB ID
 		tandem: false, // use interval not device update frequency (usually 30 mins)
 		interval: 60, // seconds
-		recent: 10,
+		recent: 10, // how many fine interval updates to maintain in memory
 		debug: 0
 	},
 	recent: [], // oldest is last
@@ -68,9 +71,11 @@ var wusb = {
         'fb.date_time'     : [43, 'dt'],
 		NA: [0,'XX']
 	},
+	// OK, this is a bit naf but it works
 	_pad: function (str, n) {
 		return ('                    '+str).slice(n*-1);
 	},
+	// a collection of data conversion utilities that make assumptions about byte boundaries
 	_d: {
 		// translates offset to block/offset format
 		'x': function(offset) {
@@ -128,11 +133,9 @@ var wusb = {
 		},
 		// unsigned short
 		'us' : function(data,blk,i,base,prec) {
-//			console.log(blk,i,base,prec);
 			var hb = (i+1<8)?blk:blk+1, hbi = (i+1<8)?i+1:(7-i);
 			var hi = data[hb][hbi];
 			var lo = data[blk][i];
-//			console.log(blk,i,base,prec,hi,lo);
 			if(lo === 0xFF && hi === 0xFF) return null;
 			var res = (hi*256)+lo;
 			if(base) {
@@ -144,14 +147,12 @@ var wusb = {
 			return ('00000'+v).slice(-l);
 		},
 		'wa' : function(data,blk,i,base,prec) {
-//			console.log(blk,i,'wind');
 			var lo = data[blk][i];
 			var hi = data[blk][i+2]&0x0f;
 			var res = hi<<8+lo;
 			return (prec) ? Number(res.toFixed(prec)) : res;
 		},
 		'wg' : function(data,blk,i,base,prec) {
-//			console.log(blk,i,'gust');
 			var lo = data[blk][i];
 			var hi = data[blk][i+1]&0xf0;
 			var res = hi<<4+lo;
@@ -159,7 +160,6 @@ var wusb = {
 		},
 		// date time
 		'dt' : function(data,blk,i,base,prec) {
-//			console.log(blk,i,i+4); -- is data ever split across buffer, if so will need to check overflow of i
 			var yy = wusb._d.bc(data,blk,i);
 			var mm = wusb._d.bc(data,blk,i+1);
 			var dd = wusb._d.bc(data,blk,i+2);
@@ -176,6 +176,7 @@ var wusb = {
 			if (wusb._d[format]) {
 				return wusb._d[format](this,i[0],i[1],base,prec);
 			} else {
+				// if no convertor registered dump a string representation
 				return [offset,'|',i[0],i[1],'>>',this[i[0]][i[1]], '0x'+Number(this[i[0]][i[1]]).toString(16).toUpperCase()].join(',');
 			}
 		}
@@ -183,7 +184,6 @@ var wusb = {
 	// helper function for accessing dictionary
 	f: function(data, name) {
 		var ans = 'NA';
-		// console.log(data, name, wusb._map[name]);
 		if(wusb._map[name]) {
 			ans = wusb.d.apply(data, wusb._map[name]);
 		}
@@ -192,8 +192,9 @@ var wusb = {
 	decode: function(data, list_or_bool) {
 		var block = {};
 		if(list_or_bool.length) {
-
+			// TBD - decode a list of variables
 		} else {
+			// decode fixed dictionary or individual weather record
 			var pre = (list_or_bool) ? 'fb.':'rf.';
 			for(var key in wusb._map) {
 				if( key.indexOf(pre) === 0 ) {
@@ -223,10 +224,12 @@ var wusb = {
 		if(wusb.conf.debug>3) console.log('_range:',lo, hi, max, inc, v);
 		return v;
 	},
+	// construct a command block to send to USB device
 	cmd: function(address) {
 		var hi = Math.floor(address/256), lo = address%256;
 		return [0xA1, hi, lo, 0x20,0xA1, hi, lo, 0x20];
 	},
+	// I had problems with removeListners so implemented this, need to revisit to know if actually needed
 	removeListeners: function(d, f) {
 		var listeners = station.listeners(f);
 		if(wusb.conf.debug>3) console.log('listeners',listeners);
@@ -242,11 +245,12 @@ var wusb = {
 		if(wusb.conf.debug>2) console.log('range',locs);
 		var count = -1;
 		var buf = [];
+		// request the next block of data sent by USB device
 		var _next = function() {
 			if(locs.length>0) {
 				var addr = locs.shift();
 				var cmd = wusb.cmd(addr);
-				count = 4;
+				count = 4; // the number of bytes in the expected response from device
 				station.write(cmd);
 			} else {
 				// make sure all listeners removed, before calling finished
@@ -254,6 +258,7 @@ var wusb = {
 				finished(buf);
 			}
 		};
+		// collect the data and store
 		var _chunk = function (data) {
 			buf.push(data);
 			count--;
@@ -270,6 +275,9 @@ var wusb = {
 		var dt = fixed['fb.date_time']+'Z'+((fixed['fb.timezone']<0)?'-':'+')+fixed['fb.timezone'];
 		return dt;
 	},
+	// poll the weather station
+	//  1. get the fixed block and extract the current location of the active record
+	//  2. get the current record, store in recent array, set currrent weather global, setup next poll
 	poll: function() {
 		var started = process.hrtime();
 		wusb.getRange(station, 0x00,0xff,function(fb) {
@@ -294,11 +302,12 @@ var wusb = {
 		});
 	}
 }
-//
+// some global vars
 var weather = {};
 var fixed = {};
 var history = [];
-var interval = 1000; 
+var interval = 1000;
+// ok, let's attempt to find the weather station by the USB ids (see wusb.conf) 
 var station = wusb.open();
 if (station == null ) {
 	console.log('cannot find usb weather station, exiting.');
@@ -307,7 +316,7 @@ if (station == null ) {
 console.log('weather station ready, polling');
 // initialse weather
 wusb.poll();
-// define rest services
+// define rest/json services
 function getWeather(req, res){
     res.setHeader('Access-Control-Allow-Origin','*');
     console.log('sending current weather');
