@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <!-- META -->
+        <title>Home | HomePage</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+        <meta name="description" content="" />
+
+        <!-- CSS -->
+        <link rel="stylesheet" type="text/css" href="css/kickstart.css" media="all" />
+        <link rel="stylesheet" type="text/css" href="style.css" media="all" /> 
+
+        <!-- Javascript -->
+        <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+        <script type="text/javascript" src="js/kickstart.js"></script>
+        <script type="text/javascript" src="js/moment.min.js"></script>
+        <script type="text/javascript" src="js/homepage.js"></script>
+        <script type="text/javascript">
+            var weather = null;
+            $(document).ready(function() {
+                function tick() {
+                    $('.lastupated').text(moment());
+                    $('.age').text(moment(weather['unix']-(60-weather['rf.delay'])*60000).fromNow());
+                }
+                function direction(now,then,field) {
+                    if(now[field]===then[field]) return "";
+                    var g = (now[field]>then[field])?'icon-circle-arrow-up':'icon-circle-arrow-down';
+                    return '<i class="'+g+'"></i>';
+                }
+                console.log("calling homepage");
+                hp.init({name:'Stathfarrar'}).getJSON("/weather/recent", 60, function(data) {
+                    weather = data.data[0];
+                    delayed = data.data[data.data.length-1];
+                    $('.indoor').text(weather['rf.temp_in']);
+                    $('.outdoor').text(weather['rf.temp_out']);
+                    $('.humin').text(weather['rf.hum_in']);
+                    $('.humout').text(weather['rf.hum_out']);
+                    $('.pressure').text(weather['rf.abs_pressure']);
+                    $('.indoor-direction').empty().append($(direction(weather,delayed,'rf.temp_in')));
+                    $('.outdoor-direction').empty().append($(direction(weather,delayed,'rf.temp_out')));
+                    $('.pressure-direction').empty().append($(direction(weather,delayed,'rf.abs_pressure')));
+                    $('.status').removeClass().addClass((data.raining)?'icon-umbrella':'icon-cloud');
+                    clearInterval(tick);
+                    setInterval(tick, 1000);
+                    return true;
+                });
+            });
+        </script>
+    </head>
+    <body>
+        <div class="grid">
+            <div class="col_12" style="margin-top:4rem;">
+                <h1 class="center"><span class='home'></span><br/><i id="status" class="icon-cloud"></i></h1>
+                <h4 style="color:#999;margin-bottom:40px;" class="center"><span title="indoor temperature" class='indoor'>--</span>&deg;C<span class="indoor-direction" style="font-size: 1rem;"></span><br/><span style="font-size: 1rem;" title="indoor humdity" class='humin'>--</span><span style="font-size: 0.8rem;">%</span></h4>
+                <h4 style="color:#999;margin-bottom:40px;" class="center"><span title="outdoor temperature" class='outdoor'>--</span>&deg;C<span class="outdoor-direction" style="font-size: 1rem;"></span><br/><span style="font-size: 1rem;" title="outdoor humdity" class='humout'>--</span><span style="font-size: 0.8rem;">%</span></h4>
+                <h4 style="color:#999;margin-bottom:40px;" class="center"><span title="pressure" class='pressure'>--</span><span style="font-size: 1rem;">hpa</span><span class="pressure-direction" style="font-size: 1rem;"></span></h4>
+                <p class="center"><span class="lastupated"></span><br/><span class="age"></span></p>
+            </div>
+        </div> <!-- End Grid -->
+    </body>
+</html>
