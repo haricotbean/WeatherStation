@@ -8,19 +8,19 @@ A simple nodejs service that provides a HTTP weather service for the 1080 based 
 
 ### Data and UI Services Provided ###
 
-http://<server>:<port>/weather/settings - return JSON object for station settings
-http://<server>:<port>/weather/now - return JSON object for latest weather reading
-http://<server>:<port>/weather/recent - return JSON object for most recent readings with (limited) analysis (raining)
-http://<server>:<port>/weather/history - return JSON formatted full history on device
++ http://<server>:<port>/weather/settings - return JSON object for station settings
++ http://<server>:<port>/weather/now - return JSON object for latest weather reading
++ http://<server>:<port>/weather/recent - return JSON object for most recent readings with (limited) analysis (raining)
++ http://<server>:<port>/weather/history - return JSON formatted full history on device
 
 http://<server>:<port>/homepage/index.html - display a web page of data using KickStart and jQuery
 
 ### Requirements ###
 
-KickStart - included but a notable mention
-jQuery - referenced in UI components and awesome
-node-hid npm - made solving the USB parts a lot easier (thank-you)
-restify npm - makes the HTTP service elements so simple
++ KickStart - included but a notable mention
++ jQuery - referenced in UI components and awesome
++ node-hid npm - made solving the USB parts a lot easier (thank-you)
++ restify npm - makes the HTTP service elements so simple
 
 ### Installation ###
 
