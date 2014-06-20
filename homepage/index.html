@@ -29,7 +29,7 @@
                     return '<i class="'+g+'"></i>';
                 }
                 console.log("calling homepage");
-                hp.init({name:'Stathfarrar'}).getJSON("/weather/recent", 60, function(data) {
+                hp.init({name:'My Home'}).getJSON("/weather/recent", 60, function(data) {
                     weather = data.data[0];
                     delayed = data.data[data.data.length-1];
                     $('.indoor').text(weather['rf.temp_in']);
