@@ -40,7 +40,7 @@
                     $('.indoor-direction').empty().append($(direction(weather,delayed,'rf.temp_in')));
                     $('.outdoor-direction').empty().append($(direction(weather,delayed,'rf.temp_out')));
                     $('.pressure-direction').empty().append($(direction(weather,delayed,'rf.abs_pressure')));
-                    $('.status').removeClass().addClass((data.data.raining)?'icon-umbrella':'icon-cloud');
+                    $('.status').removeClass().addClass((data.raining)?'icon-umbrella':'icon-cloud');
                     clearInterval(tick);
                     setInterval(tick, 1000);
                     return true;
