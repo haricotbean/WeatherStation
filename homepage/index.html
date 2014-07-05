@@ -18,29 +18,33 @@
         <script type="text/javascript" src="js/homepage.js"></script>
         <script type="text/javascript">
             var weather = null;
+            function tick() {
+                $('.lastupated').text(moment());
+                $('.age').text(moment(weather['unix'] - (60 - weather['rf.delay']) * 60000).fromNow());
+            }
+            function direction(now, then, field) {
+                if (now[field] === then[field])
+                    return "";
+                var g = (now[field] > then[field]) ? 'icon-circle-arrow-up' : 'icon-circle-arrow-down';
+                return '<i class="' + g + '"></i>';
+            }
+            function setRaining(flag) {
+                $('#status').removeClass().addClass((flag) ? 'icon-umbrella' : 'icon-cloud');
+            }
             $(document).ready(function() {
-                function tick() {
-                    $('.lastupated').text(moment());
-                    $('.age').text(moment(weather['unix']-(60-weather['rf.delay'])*60000).fromNow());
-                }
-                function direction(now,then,field) {
-                    if(now[field]===then[field]) return "";
-                    var g = (now[field]>then[field])?'icon-circle-arrow-up':'icon-circle-arrow-down';
-                    return '<i class="'+g+'"></i>';
-                }
                 console.log("calling homepage");
-                hp.init({name:'My Home'}).getJSON("/weather/recent", 60, function(data) {
+                hp.init({name: 'My Home'}).getJSON("/weather/recent", 60, function(data) {
                     weather = data.data[0];
-                    delayed = data.data[data.data.length-1];
+                    delayed = data.data[data.data.length - 1];
                     $('.indoor').text(weather['rf.temp_in']);
                     $('.outdoor').text(weather['rf.temp_out']);
                     $('.humin').text(weather['rf.hum_in']);
                     $('.humout').text(weather['rf.hum_out']);
                     $('.pressure').text(weather['rf.abs_pressure']);
-                    $('.indoor-direction').empty().append($(direction(weather,delayed,'rf.temp_in')));
-                    $('.outdoor-direction').empty().append($(direction(weather,delayed,'rf.temp_out')));
-                    $('.pressure-direction').empty().append($(direction(weather,delayed,'rf.abs_pressure')));
-                    $('.status').removeClass().addClass((data.raining)?'icon-umbrella':'icon-cloud');
+                    $('.indoor-direction').empty().append($(direction(weather, delayed, 'rf.temp_in')));
+                    $('.outdoor-direction').empty().append($(direction(weather, delayed, 'rf.temp_out')));
+                    $('.pressure-direction').empty().append($(direction(weather, delayed, 'rf.abs_pressure')));
+                    setRaining(data.raining);
                     clearInterval(tick);
                     setInterval(tick, 1000);
                     return true;
