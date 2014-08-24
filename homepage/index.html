@@ -13,10 +13,13 @@
 		<style>
 		#chart {
 			vertical-align: middle;
+			margin: auto;
+			height:100px;
+			width:300px;
 		}
 		.v-bar {
 			display: inline-block;
-			width: 33px;
+			width: 27px;
 			margin-left: 2px;
 			margin-right: 2px;
 			background-color: rgba(55,55,55,0.1);
@@ -37,6 +40,9 @@
 		.date {
 			display: inline-block;
 			vertical-align: middle;
+		}
+		.footer {
+			font-size: 0.6em;
 		}
 		</style>
 
@@ -79,7 +85,7 @@
                     $('.indoor-direction').empty().append($(direction(weather, delayed, 'rf.temp_in')));
                     $('.outdoor-direction').empty().append($(direction(weather, delayed, 'rf.temp_out')));
                     $('.pressure-direction').empty().append($(direction(weather, delayed, 'rf.abs_pressure')));
-                    $('.status').removeClass().addClass((data.raining) ? 'icon-umbrella' : 'icon-cloud');
+                    $('.status').removeClass().addClass((data.raining) ? 'icon-umbrella' : ((weather['rf.temp_out']>17)?'icon-certificate':'icon-cloud'));
                     clearInterval(tick);
                     setInterval(tick, 1000);
                     if (!history.lastUpdated || (history.lastUpdated + (30 * 60 * 1000)) < new Date().getTime()) {
@@ -109,33 +115,38 @@
 							 for(var k in history['day']){
 								days.push(history['day'][k])
 							 }
-							 days.reverse();
+							 days = days.reverse().slice(0,7);
 							 console.log('history', history, days);
 							 var chart = d3.select("#chart").selectAll('div.v-bar').data(days).enter().append('div').attr('class','v-bar').append('span');
 							 d3.selectAll('div.v-bar').data(days).style('margin-bottom', function(d) {
 								var b = Math.max(0,Math.round(d.temp_out.min-history.global.temp_out.min));
-								console.log(d.d,d.temp_out.min,'margin-bottom',b);
+//								console.log(d.d,d.temp_out.min,'margin-bottom',b);
 								return b+'px';
 							 }).style('margin-top', function(d) {
 								var t = Math.max(0,Math.round(history.global.temp_out.max-d.temp_out.max));
-								console.log(d.d,d.temp_out.max,'margin-top',t);
+//								console.log(d.d,d.temp_out.max,'margin-top',t);
 								return t+'px';
 							 }).style('height', function(d) {
 								var b = Math.max(0,Math.round(d.temp_out.min-history.global.temp_out.min));
 								var t = Math.max(0,Math.round(history.global.temp_out.max-d.temp_out.max));
-								console.log(d.d,'height',100-b-t);
+//								console.log(d.d,'height',100-b-t);
 								return (100-b-t)+'px';
 							 }).select('span').html(function(d) {
 								var p = d.d.split('-');
 								return '<span class="high">'+Math.round(d.temp_out.max) +
-									'C</span><br/><span class="date">' + p[2]+"/"+p[1] + '</span><br/><span class="low">' + Math.round(d.temp_out.min) + "C</span>";
+									'C</span><br/><i></i><br/>' +
+									'<span class="date">' + p[2]+"/"+p[1] + '</span><br/><span class="low">' + 
+									Math.round(d.temp_out.min) + "C</span>";
  							 });
 							 d3.selectAll('div.v-bar .date').data(days).style('height',function(d) {
 								var b = Math.max(0,Math.round(d.temp_out.min-history.global.temp_out.min));
 								var t = Math.max(0,Math.round(history.global.temp_out.max-d.temp_out.max));
-								console.log(d.d,'.date height',100-b-t-20);
-								return (100-b-t-48)+'px';
+//								console.log(d.d,'.date height',100-b-t-20);
+								return 'auto';
 							 });
+							d3.selectAll('div span i').data(days).attr('class',function (d) {
+								return (d.rain.max>d.rain.min) ? "icon-umbrella":((d.temp_out.max>18)?'icon-certificate':'icon-cloud');
+							});
                         });
                     }
                     return true;
@@ -145,13 +156,13 @@
     </head>
     <body>
         <div class="grid">
-            <div class="col_12" style="margin-top:4rem;text-align:center">
+            <div class="col_12" style="margin-top:2rem;text-align:center">
                 <h1 class="center"><span class='home'></span><br/><i id="status" class="icon-cloud"></i></h1>
-				<div id="chart" style="margin:auto;height:100px; width:340px"></div>
+				<div id="chart"></div>
                 <h4 style="color:#999;margin-bottom:20px;" class="center"><span style="font-size: 0.8rem;">indoor</span>&nbsp;<span title="indoor temperature" class='indoor'>--</span>&deg;C&nbsp;<span title="trend" class="indoor-direction" style="font-size: 1rem;"></span>&nbsp;<span style="font-size: 1rem;" title="indoor humdity" class='humin'>--</span><span style="font-size: 0.8rem;">%</span></h4>
                 <h4 style="color:#999;margin-bottom:20px;" class="center"><span style="font-size: 0.8rem;">outdoor</span>&nbsp;<span title="outdoor temperature" class='outdoor'>--</span>&deg;C&nbsp;<span title="trend"  class="outdoor-direction" style="font-size: 1rem;"></span>&nbsp;<span style="font-size: 1rem;" title="outdoor humdity" class='humout'>--</span><span style="font-size: 0.8rem;">%</span></h4>
                 <h4 style="color:#999;margin-bottom:2 0px;" class="center"><span style="font-size: 0.8rem;">pressure</span>&nbsp;<span title="pressure" class='pressure'>--</span><span style="font-size: 1rem;">hpa</span>&nbsp;<span title="trend"  class="pressure-direction" style="font-size: 1rem;"></span></h4>
-                <p class="center"><span class="lastupated"></span><br/><span class="age"></span></p>
+                <p class="center"><span class="footer"><span class="lastupated"></span><br/><span class="age"></span></span>
             </div>
         </div> <!-- End Grid -->
     </body>
