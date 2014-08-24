@@ -9,29 +9,64 @@
 
         <!-- CSS -->
         <link rel="stylesheet" type="text/css" href="css/kickstart.css" media="all" />
-        <link rel="stylesheet" type="text/css" href="style.css" media="all" /> 
+        <link rel="stylesheet" type="text/css" href="style.css" media="all" />
+		<style>
+		#chart {
+			vertical-align: middle;
+		}
+		.v-bar {
+			display: inline-block;
+			width: 33px;
+			margin-left: 2px;
+			margin-right: 2px;
+			background-color: rgba(55,55,55,0.1);
+			text-align: center;
+			vertical-align: middle;
+			border: 0;
+		}
+		.v-bar span {
+			font-size: 0.5em;
+			text-align: center;
+			padding: 0;
+			margin: 0;
+			border: 0;
+		}
+		.high, .low {
+			height: 10px;
+		}
+		.date {
+			display: inline-block;
+			vertical-align: middle;
+		}
+		</style>
 
         <!-- Javascript -->
         <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+		<script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
         <script type="text/javascript" src="js/kickstart.js"></script>
         <script type="text/javascript" src="js/moment.min.js"></script>
         <script type="text/javascript" src="js/homepage.js"></script>
         <script type="text/javascript">
             var weather = null;
-            function tick() {
-                $('.lastupated').text(moment());
-                $('.age').text(moment(weather['unix'] - (60 - weather['rf.delay']) * 60000).fromNow());
-            }
-            function direction(now, then, field) {
-                if (now[field] === then[field])
-                    return "";
-                var g = (now[field] > then[field]) ? 'icon-circle-arrow-up' : 'icon-circle-arrow-down';
-                return '<i class="' + g + '"></i>';
-            }
-            function setRaining(flag) {
-                $('#status').removeClass().addClass((flag) ? 'icon-umbrella' : 'icon-cloud');
-            }
             $(document).ready(function() {
+                function tick() {
+                    $('.lastupated').text(moment());
+                    $('.age').text(moment(weather['unix'] - (60 - weather['rf.delay']) * 60000).fromNow());
+                }
+                function direction(now, then, field) {
+                    if (now[field] === then[field])
+                       g = 'icon-circle-arrow-right';
+					else
+                    	g = (now[field] > then[field]) ? 'icon-circle-arrow-up' : 'icon-circle-arrow-down';
+                    return '<i class="' + g + '"></i>';
+                }
+                var history = {day:{},global:{rain:{},temp_out:{},temp_in:{}}};
+                function setHistory(datetime, key, aspect, rule, val) {
+                    if(!history['day'][datetime][key][aspect]||rule) history['day'][datetime][key][aspect]=val;
+                }
+                function setGlobal(key, aspect, rule, val) {
+                    if(!history['global'][key][aspect]||rule) history['global'][key][aspect]=val;
+                }
                 console.log("calling homepage");
                 hp.init({name: 'My Home'}).getJSON("/weather/recent", 60, function(data) {
                     weather = data.data[0];
@@ -44,9 +79,65 @@
                     $('.indoor-direction').empty().append($(direction(weather, delayed, 'rf.temp_in')));
                     $('.outdoor-direction').empty().append($(direction(weather, delayed, 'rf.temp_out')));
                     $('.pressure-direction').empty().append($(direction(weather, delayed, 'rf.abs_pressure')));
-                    setRaining(data.raining);
+                    $('.status').removeClass().addClass((data.raining) ? 'icon-umbrella' : 'icon-cloud');
                     clearInterval(tick);
                     setInterval(tick, 1000);
+                    if (!history.lastUpdated || (history.lastUpdated + (30 * 60 * 1000)) < new Date().getTime()) {
+                        console.log("refresh history");
+                        history.lastUpdated = new Date().getTime();
+                        $.getJSON("/weather/history", function(data) {
+                            console.log('history records', data.length);
+                            for (var d in data) {
+                                var node = data[d];
+                                var dt = node.datetime.substring(0, node.datetime.indexOf('T'));
+                                if (!history['day'][dt]) history['day'][dt]={d:dt, c:0,rain:{},temp_out:{},temp_in:{}};
+								 history['day'][dt].c++;
+                                setHistory(dt,'rain','min',history['day'][dt].rain.min>node['rf.rain'],node['rf.rain']);
+                                setHistory(dt,'rain','max',history['day'][dt].rain.max<node['rf.rain'],node['rf.rain']);
+                                setGlobal('rain','min',history['global'].rain.min>node['rf.rain'],node['rf.rain']);
+                                setGlobal('rain','max',history['global'].rain.max<node['rf.rain'],node['rf.rain']);
+                                setHistory(dt,'temp_in','min',history['day'][dt].temp_in.min>node['rf.temp_in'],node['rf.temp_in']);
+                                setHistory(dt,'temp_in','max',history['day'][dt].temp_in.max<node['rf.temp_in'],node['rf.temp_in']);
+                                setGlobal('temp_in','min',history['global'].temp_in.min>node['rf.temp_in'],node['rf.temp_in']);
+                                setGlobal('temp_in','max',history['global'].temp_in.max<node['rf.temp_in'],node['rf.temp_in']);
+                                setHistory(dt,'temp_out','min',history['day'][dt].temp_out.min>node['rf.temp_out'],node['rf.temp_out']);
+                                setHistory(dt,'temp_out','max',history['day'][dt].temp_out.max<node['rf.temp_out'],node['rf.temp_out']);
+                                setGlobal('temp_out','min',history['global'].temp_out.min>node['rf.temp_out'],node['rf.temp_out']);
+                                setGlobal('temp_out','max',history['global'].temp_out.max<node['rf.temp_out'],node['rf.temp_out']);
+                            }
+							 var days = [];
+							 for(var k in history['day']){
+								days.push(history['day'][k])
+							 }
+							 days.reverse();
+							 console.log('history', history, days);
+							 var chart = d3.select("#chart").selectAll('div.v-bar').data(days).enter().append('div').attr('class','v-bar').append('span');
+							 d3.selectAll('div.v-bar').data(days).style('margin-bottom', function(d) {
+								var b = Math.max(0,Math.round(d.temp_out.min-history.global.temp_out.min));
+								console.log(d.d,d.temp_out.min,'margin-bottom',b);
+								return b+'px';
+							 }).style('margin-top', function(d) {
+								var t = Math.max(0,Math.round(history.global.temp_out.max-d.temp_out.max));
+								console.log(d.d,d.temp_out.max,'margin-top',t);
+								return t+'px';
+							 }).style('height', function(d) {
+								var b = Math.max(0,Math.round(d.temp_out.min-history.global.temp_out.min));
+								var t = Math.max(0,Math.round(history.global.temp_out.max-d.temp_out.max));
+								console.log(d.d,'height',100-b-t);
+								return (100-b-t)+'px';
+							 }).select('span').html(function(d) {
+								var p = d.d.split('-');
+								return '<span class="high">'+Math.round(d.temp_out.max) +
+									'C</span><br/><span class="date">' + p[2]+"/"+p[1] + '</span><br/><span class="low">' + Math.round(d.temp_out.min) + "C</span>";
+ 							 });
+							 d3.selectAll('div.v-bar .date').data(days).style('height',function(d) {
+								var b = Math.max(0,Math.round(d.temp_out.min-history.global.temp_out.min));
+								var t = Math.max(0,Math.round(history.global.temp_out.max-d.temp_out.max));
+								console.log(d.d,'.date height',100-b-t-20);
+								return (100-b-t-48)+'px';
+							 });
+                        });
+                    }
                     return true;
                 });
             });
@@ -54,11 +145,12 @@
     </head>
     <body>
         <div class="grid">
-            <div class="col_12" style="margin-top:4rem;">
+            <div class="col_12" style="margin-top:4rem;text-align:center">
                 <h1 class="center"><span class='home'></span><br/><i id="status" class="icon-cloud"></i></h1>
-                <h4 style="color:#999;margin-bottom:40px;" class="center"><span title="indoor temperature" class='indoor'>--</span>&deg;C<span class="indoor-direction" style="font-size: 1rem;"></span><br/><span style="font-size: 1rem;" title="indoor humdity" class='humin'>--</span><span style="font-size: 0.8rem;">%</span></h4>
-                <h4 style="color:#999;margin-bottom:40px;" class="center"><span title="outdoor temperature" class='outdoor'>--</span>&deg;C<span class="outdoor-direction" style="font-size: 1rem;"></span><br/><span style="font-size: 1rem;" title="outdoor humdity" class='humout'>--</span><span style="font-size: 0.8rem;">%</span></h4>
-                <h4 style="color:#999;margin-bottom:40px;" class="center"><span title="pressure" class='pressure'>--</span><span style="font-size: 1rem;">hpa</span><span class="pressure-direction" style="font-size: 1rem;"></span></h4>
+				<div id="chart" style="margin:auto;height:100px; width:340px"></div>
+                <h4 style="color:#999;margin-bottom:20px;" class="center"><span style="font-size: 0.8rem;">indoor</span>&nbsp;<span title="indoor temperature" class='indoor'>--</span>&deg;C&nbsp;<span title="trend" class="indoor-direction" style="font-size: 1rem;"></span>&nbsp;<span style="font-size: 1rem;" title="indoor humdity" class='humin'>--</span><span style="font-size: 0.8rem;">%</span></h4>
+                <h4 style="color:#999;margin-bottom:20px;" class="center"><span style="font-size: 0.8rem;">outdoor</span>&nbsp;<span title="outdoor temperature" class='outdoor'>--</span>&deg;C&nbsp;<span title="trend"  class="outdoor-direction" style="font-size: 1rem;"></span>&nbsp;<span style="font-size: 1rem;" title="outdoor humdity" class='humout'>--</span><span style="font-size: 0.8rem;">%</span></h4>
+                <h4 style="color:#999;margin-bottom:2 0px;" class="center"><span style="font-size: 0.8rem;">pressure</span>&nbsp;<span title="pressure" class='pressure'>--</span><span style="font-size: 1rem;">hpa</span>&nbsp;<span title="trend"  class="pressure-direction" style="font-size: 1rem;"></span></h4>
                 <p class="center"><span class="lastupated"></span><br/><span class="age"></span></p>
             </div>
         </div> <!-- End Grid -->

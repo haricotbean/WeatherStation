@@ -221,7 +221,7 @@ var wusb = {
 		for(var c=lo; c<max; c+=inc) {
 			v.push(c);
 		}
-		if(wusb.conf.debug>3) console.log('_range:',lo, hi, max, inc, v);
+		if(wusb.conf.debug>3) console.log('_range:',lo, hi, max, inc, v.length);
 		return v;
 	},
 	// construct a command block to send to USB device
@@ -242,7 +242,7 @@ var wusb = {
 	// setup a bulk transfer and fire a function when complete
 	getRange: function(station, to, from, finished) {
 		var locs = wusb.range(to, from, 32);
-		if(wusb.conf.debug>2) console.log('range',locs);
+		if(wusb.conf.debug>2) console.log('range',locs.length);
 		var count = -1;
 		var buf = [];
 		// request the next block of data sent by USB device
@@ -251,6 +251,7 @@ var wusb = {
 				var addr = locs.shift();
 				var cmd = wusb.cmd(addr);
 				count = 4; // the number of bytes in the expected response from device
+				if(wusb.conf.debug>4) console.log('addr',addr);
 				station.write(cmd);
 			} else {
 				// make sure all listeners removed, before calling finished
@@ -260,6 +261,7 @@ var wusb = {
 		};
 		// collect the data and store
 		var _chunk = function (data) {
+			if(wusb.conf.debug>4) console.log('got:',data);
 			buf.push(data);
 			count--;
 			if(count===0) {
@@ -297,7 +299,7 @@ var wusb = {
 				weather.unix = (new Date(wusb.lastUpdated())).getTime() - weather['rf.delay']*60000;
 				weather.datetime = new Date(weather.unix);
 				weather.lastUpdated = new Date(wusb.lastUpdated());
-				setTimeout(wusb.poll, interval);
+				wusb.poller = setTimeout(wusb.poll, interval);
 			});
 		});
 	}
@@ -348,9 +350,12 @@ function getHistory(req, res){
 		console.log('clearing history cache');
 		history=[];
 	}
-	if ( history.length == 0) {
+	if ( history.length === 0) {
+	    console.log('suspending poller');
+		clearTimeout(wusb.poller);
 		console.log('reading history from device');
-		wusb.getRange(station, 0x100, current, function(data) {
+		// 12288 is amount of data required for 8 days
+		wusb.getRange(station, Math.max(0x100, current-12288), current, function(data) {
 			for(var i=data.length-4; i>=0; i-=4) {
 				var reading = wusb.decode(data.slice(i,i+4),false);
 				unix = unix - (reading['rf.delay']*60000);
@@ -358,6 +363,8 @@ function getHistory(req, res){
 				reading.datetime = new Date(reading.unix);
 				history.push(reading);
 			}
+		    console.log('resuming poller');
+			wusb.poller = setTimeout(wusb.poll, ((wusb.conf.tandem) ? fixed['fb.read_period']*1000*60 : 1000*wusb.conf.interval));
 		    res.send(200 , [weather].concat(history));
 		});
 	} else {
