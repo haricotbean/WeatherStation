@@ -28,8 +28,8 @@ var wusb = {
         'rf.hum_out'       : [4, 'ub'],
         'rf.temp_out'      : [5, 'ss', 0.1, 1],
         'rf.abs_pressure'  : [7, 'us', 0.1, 1],
-        'rf.wind_ave'      : [9, 'wa', 0.1], // in metres/sec
-        'rf.wind_gust'     : [10, 'wg', 0.1], // in metres/sec
+        'rf.wind_ave'      : [9, 'wa', 0.1, 1], // in metres/sec
+        'rf.wind_gust'     : [10, 'wg', 0.1, 1], // in metres/sec
         'rf.wind_dir'      : [12, 'ub', 22.5], // position from north
         'rf.rain'          : [13, 'us', 0.3, 1], // total rain
         'rf.status'        : [15, 'bf', ['b1','b2','b3','b4','b5','lost_sensor_contact','rain_overflow','b8']],
@@ -148,14 +148,14 @@ var wusb = {
 		},
 		'wa' : function(data,blk,i,base,prec) {
 			var lo = data[blk][i];
-			var hi = data[blk][i+2]&0x0f;
-			var res = hi<<8+lo;
+			var hi = (data[blk][i+2]&0x0f) << 8;
+			var res = (hi+lo) * base;
 			return (prec) ? Number(res.toFixed(prec)) : res;
 		},
 		'wg' : function(data,blk,i,base,prec) {
 			var lo = data[blk][i];
-			var hi = data[blk][i+1]&0xf0;
-			var res = hi<<4+lo;
+			var hi = (data[blk][i+1]&0xf0) << 4;
+			var res = (hi+lo) * base;
 			return (prec) ? Number(res.toFixed(prec)) : res;
 		},
 		// date time
